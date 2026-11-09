@@ -1,84 +1,156 @@
-# Despliegue en Linux
+# Cómo poner el proyecto a funcionar en Linux
 
-La guía del proyecto exige que la aplicación se ejecute sobre Linux. Estos pasos son para Ubuntu/Debian con Apache, PHP y PostgreSQL.
+Esta guía es para el equipo. La idea es que cualquiera de nosotros pueda repetirla sin ayuda y sin entender todo el detalle técnico. Cada paso dice **qué hacemos** y **por qué**.
 
-## 1. Paquetes
+La guía del proyecto exige que la entrega corra en Linux. Nosotros hemos desarrollado en Windows con XAMPP, así que esto hay que probarlo antes de sustentar, no el mismo día.
+
+> **¿No tienes Linux?** Puedes usar Ubuntu dentro de Windows con **WSL 2** (se instala desde la Microsoft Store) o con una máquina virtual en VirtualBox. Todo lo de abajo se escribe en la terminal de Ubuntu.
+
+Las instrucciones son para **Ubuntu / Debian**.
+
+---
+
+## Antes de empezar: qué vamos a montar
+
+Tres piezas que se hablan entre sí:
+
+1. **Apache + PHP**: el servidor que muestra las páginas.
+2. **PostgreSQL**: la base de datos donde viven salas, reservas, etc.
+3. **Un archivo privado de usuarios** (`usuarios.php`): donde están las cuentas y las contraseñas cifradas. Tiene que quedar **fuera** de la carpeta web, para que nadie pueda descargarlo desde el navegador.
+
+---
+
+## Paso 1. Instalar los programas
 
 ```bash
 sudo apt update
 sudo apt install apache2 php libapache2-mod-php php-pgsql postgresql
 ```
 
-## 2. Base de datos
+**Por qué:** `php-pgsql` es el "puente" que permite a PHP hablar con PostgreSQL. Sin él aparece el mensaje *"No se pudo conectar con la base de datos"* (nos pasó en Windows hasta activar `pdo_pgsql`).
+
+---
+
+## Paso 2. Preparar la base de datos
+
+Primero, ponle una contraseña conocida al usuario `postgres` (la usará la aplicación):
+
+```bash
+sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'pon_aqui_tu_clave';"
+```
+
+Luego creamos la base y cargamos los scripts, **en este orden**:
 
 ```bash
 sudo -u postgres createdb centro_tic
 sudo -u postgres psql -d centro_tic -f config/centro_tic_script.sql
-sudo -u postgres psql -d centro_tic -f config/datos_prueba.sql   # solo en una base de pruebas
+sudo -u postgres psql -d centro_tic -f config/datos_prueba.sql
 ```
 
-> Ambos scripts borran datos. No los ejecutes sobre una base con información que quieras conservar.
+- El primer script crea las tablas y las reglas.
+- El segundo mete datos de ejemplo.
 
-## 3. Aplicación
+**Cuidado:** los dos scripts borran información. Solo se ejecutan en una base de pruebas, y `centro_tic_script.sql` nunca después de que ya haya datos que queramos conservar.
+
+---
+
+## Paso 3. Copiar la aplicación
 
 ```bash
 sudo cp -r PRESTAMO_Y_RESERVA_DE_SALAS_DE_COMPUTO_CENTRO_TIC /var/www/html/
 ```
 
-Ajusta `conexion.example.php` (host, puerto, base, usuario y contraseña). En Linux el puerto por defecto de PostgreSQL es `5432`, no `5433`.
+**Importante:** la carpeta debe llamarse exactamente así, porque `auth/seguridad.php` redirige a `/PRESTAMO_Y_RESERVA_DE_SALAS_DE_COMPUTO_CENTRO_TIC/login.php`. Si le ponemos otro nombre, hay que cambiar esa línea.
 
-## 4. Archivo privado de usuarios (fuera de la carpeta pública)
+Después abrimos `conexion.example.php` y revisamos estas líneas:
+
+```php
+$puerto = '5432';              // en Linux casi siempre es 5432
+$base_datos = 'centro_tic';
+$usuario = 'postgres';
+$contrasena = 'pon_aqui_tu_clave';   // la del paso 2
+```
+
+---
+
+## Paso 4. Guardar las cuentas fuera de la carpeta web
 
 ```bash
 sudo mkdir -p /var/lib/centro_tic_privado
 sudo cp usuarios.php /var/lib/centro_tic_privado/usuarios.php
 sudo chown -R www-data:www-data /var/lib/centro_tic_privado
 sudo chmod 750 /var/lib/centro_tic_privado
-sudo chmod 640 /var/lib/centro_tic_privado/usuarios.php
-```
-
-Apache necesita escribir en la carpeta (el registro crea archivos temporales y el `.lock`) y en `usuarios.php`:
-
-```bash
 sudo chmod 660 /var/lib/centro_tic_privado/usuarios.php
 ```
 
-Indica la ruta mediante la variable de entorno `CENTRO_TIC_USUARIOS`. Con Apache, en `/etc/apache2/conf-available/centro_tic.conf`:
+**Por qué `www-data`:** es el usuario con el que corre Apache. Cuando alguien se registra, la aplicación **escribe** en ese archivo (y crea un archivo temporal y un `.lock` en la misma carpeta), así que Apache necesita permiso de escritura en la carpeta y en el archivo.
+
+Ahora le decimos a la aplicación dónde está ese archivo. Creamos el archivo de configuración de Apache:
+
+```bash
+sudo nano /etc/apache2/conf-available/centro_tic.conf
+```
+
+Dentro escribimos una sola línea:
 
 ```apache
 SetEnv CENTRO_TIC_USUARIOS /var/lib/centro_tic_privado/usuarios.php
 ```
+
+Guardamos (Ctrl+O, Enter) y salimos (Ctrl+X). Luego activamos y recargamos:
 
 ```bash
 sudo a2enconf centro_tic
 sudo systemctl reload apache2
 ```
 
-`config/rutas.php` devuelve esa ruta (o la de XAMPP si la variable no existe). Para que la aplicación la use, en `login.php` y `registro.php` reemplaza la ruta escrita a mano:
+`config/rutas.php` lee esa variable. Si no existe, usa la ruta de XAMPP de Windows, por eso en nuestros computadores no tuvimos que configurar nada.
 
-```php
-// login.php
-$archivoUsuarios = require __DIR__ . '/config/rutas.php';
-$usuarios = require $archivoUsuarios;
+> `login.php` y `registro.php` ya usan `config/rutas.php`, así que no hay nada que editar en ellos.
 
-// registro.php
-$archivoUsuarios = require __DIR__ . '/config/rutas.php';
+---
+
+## Paso 5. Probar
+
+Abrimos en el navegador:
+
+```
+http://localhost/PRESTAMO_Y_RESERVA_DE_SALAS_DE_COMPUTO_CENTRO_TIC/login.php
 ```
 
-## 5. Mayúsculas y minúsculas
+Entramos con el administrador y recorremos el panel. Para una revisión completa seguimos `docs/PLAN_DE_PRUEBAS.md`.
 
-Linux distingue mayúsculas de minúsculas. El proyecto enlaza a `../horarios/Listar.php` (con L mayúscula) y el archivo se llama igual, así que funciona; mantén esa grafía en todos los enlaces o renombra el archivo a `listar.php` y actualiza los enlaces.
+---
 
-## 6. Ruta de redirección
+## Si algo falla
 
-`auth/seguridad.php` redirige a `/PRESTAMO_Y_RESERVA_DE_SALAS_DE_COMPUTO_CENTRO_TIC/login.php`. Si cambias el nombre de la carpeta en el servidor, actualiza esa ruta.
+| Lo que vemos | Qué suele ser | Qué hacer |
+|---|---|---|
+| *"No se pudo conectar con la base de datos"* | Falta `php-pgsql`, o puerto/contraseña mal | Revisar paso 1 y las líneas de `conexion.example.php` |
+| *"No se encuentra el archivo privado de usuarios o no tiene permisos"* al registrarse | Apache no puede escribir en la carpeta de usuarios | Repetir los `chown` y `chmod` del paso 4 |
+| Al iniciar sesión dice usuario o contraseña incorrectos, y sí son correctos | La variable `CENTRO_TIC_USUARIOS` no llegó | Revisar paso 4 y recargar Apache |
+| Una página no se encuentra (404) | Nombre de carpeta distinto, o mayúsculas distintas | Linux distingue mayúsculas: `Listar.php` no es `listar.php` |
 
-## 7. Vencimiento automático de reservas
-
-La función `gestion.vencer_reservas()` debe ejecutarse periódicamente. Con cron del sistema:
+Para ver el error real, el registro de Apache es el mejor aliado:
 
 ```bash
-*/15 * * * * sudo -u postgres psql -d centro_tic -c "SELECT gestion.vencer_reservas();"
+sudo tail -n 30 /var/log/apache2/error.log
 ```
 
-La vista `v_reserva_estado` ya muestra el estado efectivo aunque la función no haya corrido, y los reportes la usan.
+---
+
+## Extra: que las reservas venzan solas
+
+La función `gestion.vencer_reservas()` marca como vencidas las solicitudes pendientes cuya hora ya pasó. Podemos programarla cada 15 minutos con cron:
+
+```bash
+sudo crontab -u postgres -e
+```
+
+y añadir al final:
+
+```
+*/15 * * * * psql -d centro_tic -c "SELECT gestion.vencer_reservas();"
+```
+
+Aunque no se programe, la aplicación muestra el estado correcto (los reportes usan la vista `v_reserva_estado`), así que esto es opcional.

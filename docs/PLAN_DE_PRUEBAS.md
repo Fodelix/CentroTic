@@ -65,12 +65,13 @@ Se prueban desde `reservas/crear.php` y `horarios/crear.php`.
 | 5.6 | Reserva que cruza una aprobada | Queda en estado PENDIENTE | |
 | 5.7 | Cancelar la reserva aprobada (en SQL) | La pendiente se aprueba automáticamente | |
 | 5.8 | Horario que se cruza con otro de la misma sala y día | «El horario se cruza con otro bloque…» | |
+| 5.9 | Cualquier error de las reglas anteriores (5.2 a 5.4) | El mensaje se ve limpio, sin «ERROR:» ni «CONTEXT:» ni nombres de funciones | |
 
 ## 6. Capacidad de sala y equipos (datos numéricos)
 
 | # | Prueba | Resultado esperado | Real |
 |---|--------|--------------------|------|
 | 6.1 | Crear sala con capacidad negativa | Rechazada | |
-| 6.2 | Crear sala con capacidad 0 | Rechazada por la restricción `capacidad > 0` de la base de datos | |
+| 6.2 | Crear sala con capacidad 0 | Rechazada: «La capacidad debe ser un número entero mayor que cero» | |
+| 6.3 | Crear un equipo con un código de inventario ya existente | «Ese código de inventario ya está registrado» | |
 
-> Nota: `salas/crear.php` y `salas/editar.php` aceptan capacidad 0 en la validación de PHP (`min_range` 0) pero la base de datos exige `capacidad > 0`. Corrige `min_range` a 1 y el atributo `min` a 1 para que el mensaje lo dé la aplicación y no un error de PostgreSQL.

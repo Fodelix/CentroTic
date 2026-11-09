@@ -93,9 +93,10 @@ function mensajeErrorBD(PDOException $e, string $porDefecto): string
         case '23514':
             return 'Los datos no cumplen las condiciones permitidas.';
         case 'P0001':
-            $detalle = $e->errorInfo[2] ?? '';
-            // El texto de PostgreSQL viene como "ERROR: mensaje"; se limpia el prefijo.
-            return trim(preg_replace('/^ERROR:\s*/', '', $detalle)) ?: $porDefecto;
+            // PostgreSQL entrega "ERROR: mensaje" y luego líneas "CONTEXT: ...".
+            // Solo se conserva la primera línea, sin el prefijo.
+            $primeraLinea = (string) strtok($e->errorInfo[2] ?? '', "\n");
+            return trim(preg_replace('/^ERROR:\s*/', '', $primeraLinea)) ?: $porDefecto;
         default:
             error_log($e->getMessage());
             return $porDefecto;

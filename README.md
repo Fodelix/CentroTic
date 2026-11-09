@@ -45,6 +45,7 @@ Scripts en `config/`:
 
 ## Documentación
 
+- [Instalación en Windows con XAMPP](docs/INSTALACION_WINDOWS_XAMPP.md)
 - [Despliegue en Linux](docs/DESPLIEGUE_LINUX.md)
 - [Plan de pruebas](docs/PLAN_DE_PRUEBAS.md)
 

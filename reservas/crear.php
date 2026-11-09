@@ -107,7 +107,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         } catch (PDOException $e) {
 
-            $mensaje = $e->errorInfo[2] ?? $e->getMessage();
+            if (($e->errorInfo[0] ?? '') === 'P0001') {
+                // Regla de negocio de la base de datos: se muestra solo su mensaje,
+                // sin el prefijo "ERROR:" ni la línea "CONTEXT:".
+                $primeraLinea = (string) strtok($e->errorInfo[2] ?? '', "\n");
+                $mensaje = trim(preg_replace('/^ERROR:\s*/', '', $primeraLinea));
+            } else {
+                error_log($e->getMessage());
+                $mensaje = 'No fue posible registrar la solicitud. Inténtalo de nuevo.';
+            }
             $tipoMensaje = 'error';
         }
     }

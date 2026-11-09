@@ -5,7 +5,7 @@
  * Debe estar FUERA de la carpeta pública del servidor web (htdocs / DocumentRoot).
  *
  * Prioridad:
- *   1. Variable de entorno CENTRO_TIC_USUARIOS (recomendada en Linux).
+ *   1. Variable CENTRO_TIC_USUARIOS (recomendada en Linux; ver docs/DESPLIEGUE_LINUX.md).
  *   2. Ruta por defecto de XAMPP en Windows.
  *
  * Uso en login.php y registro.php:
@@ -14,6 +14,9 @@
 
 $ruta = getenv('CENTRO_TIC_USUARIOS');
 
-return ($ruta !== false && $ruta !== '')
-    ? $ruta
-    : 'C:/xampp/centro_tic_privado/usuarios.php';
+// Con Apache, SetEnv puede llegar solo a $_SERVER; se revisa también ahí.
+if ($ruta === false || $ruta === '') {
+    $ruta = $_SERVER['CENTRO_TIC_USUARIOS'] ?? '';
+}
+
+return $ruta !== '' ? $ruta : 'C:/xampp/centro_tic_privado/usuarios.php';

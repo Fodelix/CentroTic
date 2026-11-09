@@ -130,7 +130,15 @@ try {
     }
 
 } catch (PDOException $e) {
-    $error = 'Error de base de datos: ' . $e->getMessage();
+    if (($e->errorInfo[0] ?? '') === 'P0001') {
+        // Regla de negocio de la base de datos: se muestra solo su mensaje,
+        // sin el prefijo "ERROR:" ni la línea "CONTEXT:".
+        $primeraLinea = (string) strtok($e->errorInfo[2] ?? '', "\n");
+        $error = trim(preg_replace('/^ERROR:\s*/', '', $primeraLinea));
+    } else {
+        error_log($e->getMessage());
+        $error = 'No se pudo completar la operación. Inténtalo de nuevo.';
+    }
 }
 
 function escapar($valor) {
